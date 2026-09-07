@@ -5,8 +5,10 @@ from .BASE import BaseIGDBSchema
 
 # 4. Endpoint: /platforms
 class PlatformSchema(BaseIGDBSchema):
-    _endpoint = "/platforms"
-
+    _endpoint  = "/platforms"
+    _full_load = True
+    _if_table_exists = 'replace'
+    
     id: int = pt.Field(unique=True)
     name: str
     slug: str | None = None

@@ -6,8 +6,10 @@ from .BASE import BaseIGDBSchema
 
 # 3. Endpoint: /genres
 class GenreSchema(BaseIGDBSchema):
-    _endpoint = "/genres"
-
+    _endpoint  = "/genres"
+    _full_load = True
+    _if_table_exists = 'replace'
+    
     id: int = pt.Field(unique=True)
     name: str
     slug: str | None = None

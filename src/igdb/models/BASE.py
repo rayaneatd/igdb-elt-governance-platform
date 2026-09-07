@@ -88,7 +88,8 @@ class BaseIGDBSchema(pt.Model):
     _index_at:         ClassVar[Sequence[IndexElement] | str] = ()
     _if_table_exists:  ClassVar[Literal["append", "fail", "replace"]] = "append"
     _tables:           ClassVar[dict[str, int]] = {}
-    
+    _full_load:        ClassVar[bool]        = False
+
         # config
     model_config = MODEL_CONFIG
     
@@ -229,6 +230,9 @@ class BaseIGDBSchema(pt.Model):
         """
         query_parts = [f"fields {cls.apicalypse_fields()};"]
         where_conditions = []
+
+        if cls._full_load:
+            last_update_value = 0
 
         if last_update_value:
             where_conditions.append(f"updated_at >= {last_update_value}")

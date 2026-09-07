@@ -474,8 +474,9 @@ def ingest_batches_to_postgres(
             if task.is_fallback and task.event_id:
                 update_fallback_event_status(db_pool, task.event_id, status="FAILED", error_message=err_msg)
             continue
-        finally:
-            complete_ingestion_run(db_pool, run_id, run_status, run_error)
+        
+        complete_ingestion_run(db_pool, run_id, run_status, run_error)
+
         # Checkpoints and Fallbacks
         if task.is_fallback and task.event_id:
             update_fallback_event_status(
