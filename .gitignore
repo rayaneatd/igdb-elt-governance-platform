@@ -12,3 +12,5 @@ tests/private/*
 __blobstorage__/
 
 __queuestorage__/
+
+app/server.log
