@@ -191,6 +191,7 @@ def get_data_from_datalake(
         endpoint=Model._endpoint,
         start_watermark=task.start_watermark,
         end_watermark=task.end_watermark,
+        full_load=Model._full_load
     )
  
     if not paths:
@@ -445,13 +446,16 @@ def ingest_batches_to_postgres(
         try:
             conflict_cols = ["id", "_valid_from"] if Model._conserve_history else ["id"]
 
-            upsert_into_postgres(
-                db_pool=db_pool,
-                schema=DatabaseSchema.ANALYTICS,
-                table_name=table_name,
-                df=main_df,
-                conflict_columns=conflict_cols
-            )
+            if Model._full_load:
+                update_into_db(schema=DatabaseSchema.ANALYTICS, table=table_name, df=main_df, if_table_exists="replace")
+            else:
+                upsert_into_postgres(
+                    db_pool=db_pool,
+                    schema=DatabaseSchema.ANALYTICS,
+                    table_name=table_name,
+                    df=main_df,
+                    conflict_columns=conflict_cols
+                )
 
             for m2m_table, m2m_df in m2m_dfs.items():
                 m2m_conflict = list(m2m_df.columns)

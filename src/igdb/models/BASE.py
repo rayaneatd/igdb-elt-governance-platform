@@ -86,7 +86,6 @@ class BaseIGDBSchema(pt.Model):
     _offset:           ClassVar[int]         = 0
     _conserve_history: ClassVar[bool]        = False
     _index_at:         ClassVar[Sequence[IndexElement] | str] = ()
-    _if_table_exists:  ClassVar[Literal["append", "fail", "replace"]] = "append"
     _tables:           ClassVar[dict[str, int]] = {}
     _full_load:        ClassVar[bool]        = False
 
