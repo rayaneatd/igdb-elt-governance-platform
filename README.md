@@ -315,8 +315,8 @@ Test coverage includes:
 - [x] **Schema Drift Auditing** — Cryptographic signature hashing and JSONB column tracking.
 - [x] **Frutiger Aero Dashboard** — Real-time control plane with RBAC and lazy tab-aware polling.
 - [x] **One-Click Deployment** — Cross-platform scripts (`deploy.ps1`, `deploy.sh`) and Docker Compose.
-- [ ] **Azure Container Apps / Kubernetes** — Cloud container deployment with Managed Identity.
-- [ ] **Orchestration with Airflow / Dagster** — Scheduled cron DAGs and alerting integration.
+- [ ] **Azure Container Apps** — Cloud container deployment with Managed Identity.
+- [ ] **Orchestration with Airflow or Dagster or Prefect** — Scheduled cron DAGs and alerting integration.
 
 ---
 
