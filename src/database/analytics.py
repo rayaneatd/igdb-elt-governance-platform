@@ -1,5 +1,7 @@
 # 1. native
 import io
+import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -25,11 +27,12 @@ from src.datalake.functions import (
     Containers,
     read_from_raw 
 )
-from .types import AnalyticsTask
+from .types import AnalyticsTask, RawBatchRef
 from src.database.logs import (
     get_checkpoints, 
     upsert_checkpoint, 
     get_unconsumed_raw_batches,
+    get_unconsumed_raw_batch_refs,
     start_ingestion_run,
     complete_ingestion_run
 )
@@ -70,7 +73,8 @@ def _get_watermark_dict(db_pool: ConnectionPool) -> dict[type, AnalyticsTask]:
                 start_watermark=event.start_watermark,
                 end_watermark=event.end_watermark,
                 is_fallback=True,
-                event_id=event.event_id
+                event_id=event.event_id,
+                last_batch_id=0
             )
         # 2. Standard continuous incremental checkpoint
         else:
@@ -80,7 +84,8 @@ def _get_watermark_dict(db_pool: ConnectionPool) -> dict[type, AnalyticsTask]:
                 start_watermark=current_ts,
                 end_watermark=None,
                 is_fallback=False,
-                event_id=None
+                event_id=None,
+                last_batch_id=ckpt.last_batch_id if ckpt else 0
             )
 
     return resolved
@@ -175,6 +180,37 @@ def sync_table_indexes(db_pool: ConnectionPool, model: type[BaseIGDBSchema]) -> 
         )
 
 
+def download_and_parse_batches(
+    azure_client: DataLakeServiceClient | BlobServiceClient,
+    Model: type,
+    paths: list[str]
+) -> pl.DataFrame:
+    """Downloads raw json blobs from ADLS and parses them into a Polars DataFrame."""
+    if not paths:
+        return pl.DataFrame()
+
+    def _download(path: str) -> bytes | None:
+        return read_from_raw(azure_client, Containers.Data.value, path)
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        raw_blobs = list(executor.map(_download, paths))
+
+    missing = [p for p, b in zip(paths, raw_blobs) if b is None]
+    if missing:
+        log_to_discord(
+            f"{len(missing)} batch(es) marked SUCCESS in batch_logs but "
+            f"missing from ADLS for {Model.__name__}: {missing[:5]}"
+            f"{'...' if len(missing) > 5 else ''}",
+            AlertLevel.ERROR,
+        )
+        raise FileNotFoundError(
+            f"Missing raw blob(s) for {Model.__name__}: {len(missing)} file(s)"
+        )
+
+    frames = [pl.read_json(io.BytesIO(b), infer_schema_length=None) for b in raw_blobs if b is not None]
+    return pl.concat(frames, how='diagonal_relaxed') if frames else pl.DataFrame()
+
+
 def get_data_from_datalake(
     azure_client: DataLakeServiceClient | BlobServiceClient,
     db_pool: ConnectionPool,
@@ -193,30 +229,8 @@ def get_data_from_datalake(
         end_watermark=task.end_watermark,
         full_load=Model._full_load
     )
- 
-    if not paths:
-        return pl.DataFrame()
- 
-    def _download(path: str) -> bytes | None:
-        return read_from_raw(azure_client, Containers.Data.value, path)
- 
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        raw_blobs = list(executor.map(_download, paths))
- 
-    missing = [p for p, b in zip(paths, raw_blobs) if b is None]
-    if missing:
-        log_to_discord(
-            f"{len(missing)} batch(es) marked SUCCESS in batch_logs but "
-            f"missing from ADLS for {Model.__name__}: {missing[:5]}"
-            f"{'...' if len(missing) > 5 else ''}",
-            AlertLevel.ERROR,
-        )
-        raise FileNotFoundError(
-            f"Missing raw blob(s) for {Model.__name__}: {len(missing)} file(s)"
-        )
- 
-    frames = [pl.read_json(io.BytesIO(b), infer_schema_length=None) for b in raw_blobs if b is not None]
-    return pl.concat(frames, how='diagonal_relaxed') if frames else pl.DataFrame()
+    return download_and_parse_batches(azure_client, Model, paths)
+
 
 
 def _stringify_for_hash(df: pl.DataFrame, column: str) -> pl.Expr:
@@ -387,16 +401,114 @@ def upsert_into_postgres(
     finally:
         cleanup_query = f"DROP TABLE IF EXISTS {schema_name}.{staging_table};"
         execute_sql_from_string(pool=db_pool, query=cleanup_query)
+def load_table_dataframe_to_postgres(
+    db_pool: ConnectionPool,
+    Model: type,
+    task: AnalyticsTask,
+    raw_df: pl.DataFrame,
+    max_batch_id: int = 0
+) -> int:
+    """
+    Applies schema enforcement, deduplication, M2M relationship extraction,
+    DQ assertions, and idempotent Postgres loading for a single table batch.
+    Updates checkpoints and watermark upon success.
+    """
+    if raw_df.is_empty():
+        return 0
+
+    table_name = Model.get_table_name()
+    aligned_df = enforce_schema_and_types(Model=Model, df=raw_df)
+    clean_df = deduplicate_records(df=aligned_df)
+    m2m_dfs = extract_m2m_relationships(Model=Model, df=clean_df)
+
+    # Drop list columns from main table if non-SCD2 (since list cols go into M2M tables)
+    if not Model._conserve_history:
+        main_df_cols = [
+            c for c in clean_df.columns
+            if c in Model.model_fields  # guard first to prevent KeyError on tech columns
+            and not _LIST_RE.match(Model._convert_to_polar_types(Model.model_fields[c].annotation))
+        ] + ["_ingested_at", "_hash"]
+        main_df = clean_df.select(main_df_cols)
+    else:
+        main_df = clean_df
+
+    if not run_dq_checks(Model=Model, df=main_df):
+        if task.is_fallback and task.event_id:
+            update_fallback_event_status(db_pool, task.event_id, status="FAILED", error_message="DQ check failed")
+        raise ValueError(f"DQ checks failed for {Model.__name__}")
+
+    # Idempotent Postgres Loading (Main Table + Junction Tables)
+    conflict_cols = ["id", "_valid_from"] if Model._conserve_history else ["id"]
+
+    if Model._full_load:
+        update_into_db(schema=DatabaseSchema.ANALYTICS, table=table_name, df=main_df, if_table_exists="replace")
+    else:
+        upsert_into_postgres(
+            db_pool=db_pool,
+            schema=DatabaseSchema.ANALYTICS,
+            table_name=table_name,
+            df=main_df,
+            conflict_columns=conflict_cols
+        )
+
+    for m2m_table, m2m_df in m2m_dfs.items():
+        m2m_conflict = list(m2m_df.columns)
+        upsert_into_postgres(
+            db_pool=db_pool,
+            schema=DatabaseSchema.ANALYTICS,
+            table_name=m2m_table,
+            df=m2m_df,
+            conflict_columns=m2m_conflict,
+            is_m2m=True
+        )
+
+    # Checkpoints and Fallbacks
+    if task.is_fallback and task.event_id:
+        update_fallback_event_status(
+            db_pool, 
+            task.event_id, 
+            status="COMPLETED", 
+            records_processed=len(main_df)
+        )
+    else:
+        raw_max = main_df["updated_at"].max() if "updated_at" in main_df.columns else None
+        new_watermark: int = int(raw_max) if isinstance(raw_max, (int, float)) else task.start_watermark
+        if new_watermark < task.start_watermark:
+            new_watermark = task.start_watermark
+
+        upsert_checkpoint(
+            pool=db_pool,
+            table_name=Model.__name__,
+            current_watermark=new_watermark,
+            last_id=0,
+            layer="ANALYTICS",
+            offset_val=0,
+            run_id=None,
+            last_batch_id=max_batch_id
+        )
+        upsert_fallback_checkpoint(
+            pool=db_pool, 
+            table_name=Model.__name__, 
+            layer='ANALYTICS', 
+            fallback_watermark=new_watermark
+        )
+        task.last_batch_id = max_batch_id
+        task.start_watermark = new_watermark
+
+    return len(main_df)
 
 
-def ingest_batches_to_postgres(
+def consume_batches_to_postgres(
     azure_client: DataLakeServiceClient | BlobServiceClient, 
-    db_pool: ConnectionPool
+    db_pool: ConnectionPool,
+    stop_event: threading.Event | None = None,
+    poll_interval: float = 1.0,
+    batch_limit: int = 10,
 ) -> None:
     """
-    Reads newly landed raw/bronze batches from ADLS, transforms them with Polars,
-    executes DQ checks, performs idempotent loading into Postgres ANALYTICS schema,
-    and updates checkpoints.
+    Streaming consumer: processes raw bronze batches from ADLS as soon as they land,
+    transforms them with Polars, performs idempotent upserts into PostgreSQL,
+    and updates checkpoints with monotonically increasing batch_id.
     """
     run_id = str(uuid.uuid4())
     start_ingestion_run(pool=db_pool, run_id=run_id, layer="ANALYTICS")
@@ -408,107 +520,108 @@ def ingest_batches_to_postgres(
         ensure_schema(db_pool=db_pool)
         data_to_ingest: dict[type, AnalyticsTask] = _get_watermark_dict(db_pool)
 
-        for Model, task in data_to_ingest.items():
-            table_name = Model.get_table_name()
+        while True:
+            batches_processed_round = 0
 
-            # 1. Ingestion from DataLake
-            raw_df: pl.DataFrame = get_data_from_datalake(
-                azure_client=azure_client,
-                db_pool=db_pool,
-                Model=Model,
-                task=task
-            )
+            for Model, task in data_to_ingest.items():
+                refs = get_unconsumed_raw_batch_refs(
+                    pool=db_pool,
+                    table_name=Model.__name__,
+                    endpoint=Model._endpoint,
+                    last_batch_id=task.last_batch_id,
+                    start_watermark=task.start_watermark,
+                    end_watermark=task.end_watermark,
+                    full_load=Model._full_load,
+                    limit=batch_limit
+                )
 
-            if raw_df.is_empty():
-                continue
+                if not refs:
+                    continue
 
-            aligned_df = enforce_schema_and_types(Model=Model, df=raw_df)
-            clean_df = deduplicate_records(df=aligned_df)
-            m2m_dfs = extract_m2m_relationships(Model=Model, df=clean_df)
+                paths = [r.path for r in refs]
+                max_batch_id = max(r.batch_id for r in refs)
 
-            # Drop list columns from main table if non-SCD2 (since list cols go into M2M tables)
-            if not Model._conserve_history:
-                main_df_cols = [
-                    c for c in clean_df.columns
-                    if c in Model.model_fields  # guard first to prevent KeyError on tech columns
-                    and not _LIST_RE.match(Model._convert_to_polar_types(Model.model_fields[c].annotation))
-                ] + ["_ingested_at", "_hash"]
-                main_df = clean_df.select(main_df_cols)
-            else:
-                main_df = clean_df
+                try:
+                    raw_df = download_and_parse_batches(azure_client, Model, paths)
+                    if not raw_df.is_empty():
+                        records_count = load_table_dataframe_to_postgres(
+                            db_pool=db_pool,
+                            Model=Model,
+                            task=task,
+                            raw_df=raw_df,
+                            max_batch_id=max_batch_id
+                        )
+                        print(
+                            f"[ANALYTICS] Processed {records_count} records for {Model.__name__} "
+                            f"({len(refs)} batch(es), up to batch_id={max_batch_id})",
+                            flush=True
+                        )
+                    else:
+                        # Advance batch_id even if batches were empty
+                        task.last_batch_id = max_batch_id
+                        upsert_checkpoint(
+                            pool=db_pool,
+                            table_name=Model.__name__,
+                            current_watermark=task.start_watermark,
+                            last_id=0,
+                            layer="ANALYTICS",
+                            offset_val=0,
+                            run_id=None,
+                            last_batch_id=max_batch_id
+                        )
 
-            if not run_dq_checks(Model=Model, df=main_df):
-                if task.is_fallback and task.event_id:
-                    update_fallback_event_status(db_pool, task.event_id, status="FAILED", error_message="DQ check failed")
-                continue
+                    batches_processed_round += len(refs)
 
-            # Idempotent Postgres Loading (Main Table + Junction Tables)
-            try:
-                conflict_cols = ["id", "_valid_from"] if Model._conserve_history else ["id"]
+                except Exception as load_err:
+                    err_msg = f"Load failed for {Model.__name__}: {load_err}"
+                    run_error = str(load_err)
+                    run_status = "FAILED"
+                    log_to_discord(err_msg, AlertLevel.ERROR)
+                    if task.is_fallback and task.event_id:
+                        update_fallback_event_status(db_pool, task.event_id, status="FAILED", error_message=err_msg)
+                    raise
 
-                if Model._full_load:
-                    update_into_db(schema=DatabaseSchema.ANALYTICS, table=table_name, df=main_df, if_table_exists="replace")
+            # If no batches were ready in this cycle, check if producer is done
+            if batches_processed_round == 0:
+                if stop_event and stop_event.is_set():
+                    # Double-check all tables before exiting
+                    has_more = any(
+                        get_unconsumed_raw_batch_refs(
+                            pool=db_pool,
+                            table_name=m.__name__,
+                            endpoint=m._endpoint,
+                            last_batch_id=t.last_batch_id,
+                            start_watermark=t.start_watermark,
+                            end_watermark=t.end_watermark,
+                            full_load=m._full_load,
+                            limit=1
+                        )
+                        for m, t in data_to_ingest.items()
+                    )
+                    if not has_more:
+                        break
+
+                if stop_event is not None:
+                    stop_event.wait(timeout=poll_interval)
                 else:
-                    upsert_into_postgres(
-                        db_pool=db_pool,
-                        schema=DatabaseSchema.ANALYTICS,
-                        table_name=table_name,
-                        df=main_df,
-                        conflict_columns=conflict_cols
-                    )
+                    break
 
-                for m2m_table, m2m_df in m2m_dfs.items():
-                    m2m_conflict = list(m2m_df.columns)
-                    upsert_into_postgres(
-                        db_pool=db_pool,
-                        schema=DatabaseSchema.ANALYTICS,
-                        table_name=m2m_table,
-                        df=m2m_df,
-                        conflict_columns=m2m_conflict,
-                        is_m2m=True
-                    )
-
-                # Checkpoints and Fallbacks
-                if task.is_fallback and task.event_id:
-                    update_fallback_event_status(
-                        db_pool, 
-                        task.event_id, 
-                        status="COMPLETED", 
-                        records_processed=len(main_df)
-                    )
-                else:
-                    raw_max = main_df["updated_at"].max() if "updated_at" in main_df.columns else None
-                    new_watermark: int = int(raw_max) if isinstance(raw_max, (int, float)) else task.start_watermark
-
-                    upsert_checkpoint(
-                        pool=db_pool,
-                        table_name=Model.__name__,
-                        current_watermark=new_watermark,
-                        last_id=0,
-                        layer="ANALYTICS",
-                        offset_val=0,
-                        run_id=None
-                    )
-                    upsert_fallback_checkpoint(
-                        pool=db_pool, 
-                        table_name=Model.__name__,
-                        layer='ANALYTICS', 
-                        fallback_watermark=new_watermark
-                    )
-
-            except Exception as load_err:
-                err_msg = f"Load failed for {Model.__name__}: {load_err}"
-                
-                run_error = str(load_err)
-                run_status = "FAILED"
-
-                log_to_discord(err_msg, AlertLevel.ERROR)
-                if task.is_fallback and task.event_id:
-                    update_fallback_event_status(db_pool, task.event_id, status="FAILED", error_message=err_msg)
-                continue
-            
     except Exception as e:
-        run_error  = str(e)
+        run_error = str(e)
         run_status = "FAILED"
+        raise
     finally:
         complete_ingestion_run(db_pool, run_id, run_status, run_error)
+
+
+def ingest_batches_to_postgres(
+    azure_client: DataLakeServiceClient | BlobServiceClient, 
+    db_pool: ConnectionPool
+) -> None:
+    """
+    Backward-compatible one-shot batch consumption.
+    Consumes all currently unconsumed raw batches in ADLS and exits.
+    """
+    done_event = threading.Event()
+    done_event.set()
+    consume_batches_to_postgres(azure_client, db_pool, stop_event=done_event, batch_limit=50)

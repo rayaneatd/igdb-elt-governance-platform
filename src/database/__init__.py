@@ -19,7 +19,7 @@ This module provides functions for interacting with the database, including:
 """
 
 
-from .types import TableCheckpoint, FallbackEvent, AnalyticsTask
+from .types import TableCheckpoint, FallbackEvent, AnalyticsTask, RawBatchRef
 
 from .auth import init_database_engine
 
@@ -33,12 +33,15 @@ from .core import (
 from .logs import (
     start_ingestion_run,
     complete_ingestion_run,
+    cleanup_orphan_runs,
     log_batch,
     log_schema_change,
     get_checkpoints,
     upsert_checkpoint,
     get_recent_schema_hash,
-    get_recent_columns_snapshot
+    get_recent_columns_snapshot,
+    get_unconsumed_raw_batches,
+    get_unconsumed_raw_batch_refs
 )
 
 from .fallback import (
@@ -47,4 +50,5 @@ from .fallback import (
     upsert_fallback_checkpoint
 )
 
-from .analytics import ingest_batches_to_postgres
+from .analytics import ingest_batches_to_postgres, consume_batches_to_postgres
+

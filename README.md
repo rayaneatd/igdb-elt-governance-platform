@@ -38,10 +38,12 @@ When IGDB introduces new fields or alters signatures:
 - The schema difference is detected via cryptographic hashing and logged into `logs.schema_history` as structured `JSONB` (`added`, `removed`, `type_changed`).
 - Discord webhook alerts notify data engineers without crashing batch workloads.
 
-### 4. Zero-Pandas High Performance Data Flow
-- Raw ingestion persists immutable JSON into Azure Data Lake (or local Azurite emulator).
-- The Analytics pipeline downloads batches using a `ThreadPoolExecutor` and transforms them with [Polars](https://pola.rs/) using Rust-backed vectorization.
-- Writes to PostgreSQL utilize the **Apache Arrow ADBC** driver (`adbc-driver-postgresql`) through staging tables, guaranteeing atomic, idempotent `ON CONFLICT` upserts.
+### 4. Concurrent Streaming & Zero-Pandas High Performance Data Flow
+- **Real-Time Producer-Consumer Pipeline**: RAW (API -> ADLS) and ANALYTICS (ADLS -> Polars -> PostgreSQL) run concurrently in real-time. As soon as a raw batch of 500 records lands in ADLS, the Analytics streaming consumer downloads, transforms, and upserts it into PostgreSQL within seconds.
+- **Monotonic `batch_id` Tracking**: Completely eliminates cursor pagination skipping by decoupling consumption from external API timestamp cursors. Consuming progress is tracked via PostgreSQL `BIGSERIAL` auto-incrementing batch IDs.
+- **Zero-Pandas Vectorization**: Micro-batches are downloaded concurrently via `ThreadPoolExecutor` and transformed with [Polars](https://pola.rs/) using Rust-backed vectorization.
+- **Atomic ADBC Loading**: Writes to PostgreSQL utilize the **Apache Arrow ADBC** driver (`adbc-driver-postgresql`) through staging tables, guaranteeing atomic, idempotent `ON CONFLICT` upserts.
+
 
 ### 5. Frutiger Aero Governance Control Plane
 - Lightweight, responsive web interface built with Flask and styled using a modern **Frutiger Aero** aesthetic (glassmorphism, radial glow gradients, live status indicators).
@@ -177,7 +179,7 @@ chmod +x deploy.sh
 4. **Dependencies**: Synchronizes all Python packages in seconds via `uv sync`.
 5. **Database Migrations**: Automatically applies `src/database/models/log_schemas.sql` to initialize all governance and audit tables.
 6. **Unit Tests**: Runs the test suite (`tests/public`) to validate schema constraints, models, and index synchronization.
-7. **ELT Pipeline Execution**: Runs `main.py`, which checks checkpoints, queries IGDB with token bucket rate-limiting (4 req/s), saves raw JSON into Azurite Bronze, vectorizes and transforms the data with Polars, and performs atomic upserts into PostgreSQL.
+7. **Concurrent ELT Execution**: Runs `main.py` in concurrent Producer-Consumer mode: the RAW layer extracts from IGDB with token bucket rate-limiting (4 req/s) and persists into Azurite Bronze, while the ANALYTICS streaming consumer concurrently downloads micro-batches, vectorizes with Polars, and executes atomic PostgreSQL upserts using monotonic `batch_id` tracking.
 8. **Browser Auto-Launch**: Automatically opens your default web browser to `http://localhost:5000`.
 9. **Dashboard Launch**: Starts the Flask Frutiger Aero governance server at `http://localhost:5000`.
 
@@ -310,6 +312,7 @@ Test coverage includes:
 ## 🗺 Project Roadmap
 
 - [x] **Raw Ingestion Layer** — Throttled extraction to ADLS Bronze JSON.
+- [x] **Concurrent Streaming ELT** — Real-time Producer-Consumer with monotonic `batch_id` consumption.
 - [x] **Event-Driven Fallbacks** — FIFO queue decoupled from continuous checkpoints.
 - [x] **Analytics Layer** — High-performance Polars transformation and ADBC PostgreSQL upsert.
 - [x] **Schema Drift Auditing** — Cryptographic signature hashing and JSONB column tracking.
@@ -317,6 +320,7 @@ Test coverage includes:
 - [x] **One-Click Deployment** — Cross-platform scripts (`deploy.ps1`, `deploy.sh`) and Docker Compose.
 - [ ] **Azure Container Apps** — Cloud container deployment with Managed Identity.
 - [ ] **Orchestration with Airflow or Dagster or Prefect** — Scheduled cron DAGs and alerting integration.
+
 
 ---
 

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 
@@ -11,6 +12,7 @@ class TableCheckpoint:
     last_id: int
     offset_val: int
     is_override_active: bool
+    last_batch_id: int = 0
 
 
 @dataclass(slots=True, frozen=True)
@@ -31,3 +33,15 @@ class AnalyticsTask:
     end_watermark: Optional[int]
     is_fallback: bool
     event_id: Optional[str]
+    last_batch_id: int = 0
+
+
+@dataclass(slots=True, frozen=True)
+class RawBatchRef:
+    """Represents an unconsumed raw batch file reference from logs.batch_logs."""
+    batch_id: int
+    path: str
+    cursor_value: int
+    offset_value: int
+    created_at: datetime
+

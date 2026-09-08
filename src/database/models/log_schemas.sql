@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS logs.ingestion_checkpoints (
     current_watermark BIGINT NOT NULL DEFAULT 0,
     fallback_watermark BIGINT NOT NULL DEFAULT 0,
     last_id INT NOT NULL DEFAULT 0,
+    last_batch_id BIGINT NOT NULL DEFAULT 0,
     layer VARCHAR(20) NOT NULL,
     -- 'RAW' or 'ANALYTICS'
     offset_val INT NOT NULL DEFAULT 0,
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS logs.ingestion_checkpoints (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (table_name, layer)
 );
+ALTER TABLE logs.ingestion_checkpoints ADD COLUMN IF NOT EXISTS last_batch_id BIGINT NOT NULL DEFAULT 0;
 CREATE TABLE IF NOT EXISTS logs.fallback_events (
     event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     table_name VARCHAR(100) NOT NULL,
