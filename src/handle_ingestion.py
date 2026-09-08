@@ -255,8 +255,6 @@ def _ingest_tables(
                 offset=offset
             )
             
-            #* logging
-            print(f"QUERY [{Model.__name__}]: {query!r}", flush=True)
             start_time = time.perf_counter()
             batch = []
             batch_status = "SUCCESS"
