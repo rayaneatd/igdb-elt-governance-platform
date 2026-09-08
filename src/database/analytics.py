@@ -404,107 +404,111 @@ def ingest_batches_to_postgres(
     run_status: Literal["COMPLETED", "FAILED"] = "COMPLETED"
     run_error = None
 
-    ensure_schema(db_pool=db_pool)
+    try:
+        ensure_schema(db_pool=db_pool)
+        data_to_ingest: dict[type, AnalyticsTask] = _get_watermark_dict(db_pool)
 
-    data_to_ingest: dict[type, AnalyticsTask] = _get_watermark_dict(db_pool)
+        for Model, task in data_to_ingest.items():
+            table_name = Model.get_table_name()
 
-    for Model, task in data_to_ingest.items():
-        table_name = Model.get_table_name()
+            # 1. Ingestion from DataLake
+            raw_df: pl.DataFrame = get_data_from_datalake(
+                azure_client=azure_client,
+                db_pool=db_pool,
+                Model=Model,
+                task=task
+            )
 
-        # 1. Ingestion from DataLake
-        raw_df: pl.DataFrame = get_data_from_datalake(
-            azure_client=azure_client,
-            db_pool=db_pool,
-            Model=Model,
-            task=task
-        )
+            if raw_df.is_empty():
+                continue
 
-        if raw_df.is_empty():
-            continue
+            aligned_df = enforce_schema_and_types(Model=Model, df=raw_df)
+            clean_df = deduplicate_records(df=aligned_df)
+            m2m_dfs = extract_m2m_relationships(Model=Model, df=clean_df)
 
-        aligned_df = enforce_schema_and_types(Model=Model, df=raw_df)
-        clean_df = deduplicate_records(df=aligned_df)
-        m2m_dfs = extract_m2m_relationships(Model=Model, df=clean_df)
-
-        # Drop list columns from main table if non-SCD2 (since list cols go into M2M tables)
-        if not Model._conserve_history:
-            main_df_cols = [
-                c for c in clean_df.columns
-                if c in Model.model_fields  # guard first to prevent KeyError on tech columns
-                and not _LIST_RE.match(Model._convert_to_polar_types(Model.model_fields[c].annotation))
-            ] + ["_ingested_at", "_hash"]
-            main_df = clean_df.select(main_df_cols)
-        else:
-            main_df = clean_df
-
-        if not run_dq_checks(Model=Model, df=main_df):
-            if task.is_fallback and task.event_id:
-                update_fallback_event_status(db_pool, task.event_id, status="FAILED", error_message="DQ check failed")
-            continue
-
-        # Idempotent Postgres Loading (Main Table + Junction Tables)
-        try:
-            conflict_cols = ["id", "_valid_from"] if Model._conserve_history else ["id"]
-
-            if Model._full_load:
-                update_into_db(schema=DatabaseSchema.ANALYTICS, table=table_name, df=main_df, if_table_exists="replace")
+            # Drop list columns from main table if non-SCD2 (since list cols go into M2M tables)
+            if not Model._conserve_history:
+                main_df_cols = [
+                    c for c in clean_df.columns
+                    if c in Model.model_fields  # guard first to prevent KeyError on tech columns
+                    and not _LIST_RE.match(Model._convert_to_polar_types(Model.model_fields[c].annotation))
+                ] + ["_ingested_at", "_hash"]
+                main_df = clean_df.select(main_df_cols)
             else:
-                upsert_into_postgres(
-                    db_pool=db_pool,
-                    schema=DatabaseSchema.ANALYTICS,
-                    table_name=table_name,
-                    df=main_df,
-                    conflict_columns=conflict_cols
-                )
+                main_df = clean_df
 
-            for m2m_table, m2m_df in m2m_dfs.items():
-                m2m_conflict = list(m2m_df.columns)
-                upsert_into_postgres(
-                    db_pool=db_pool,
-                    schema=DatabaseSchema.ANALYTICS,
-                    table_name=m2m_table,
-                    df=m2m_df,
-                    conflict_columns=m2m_conflict,
-                    is_m2m=True
-                )
+            if not run_dq_checks(Model=Model, df=main_df):
+                if task.is_fallback and task.event_id:
+                    update_fallback_event_status(db_pool, task.event_id, status="FAILED", error_message="DQ check failed")
+                continue
 
-        except Exception as load_err:
-            err_msg = f"Load failed for {Model.__name__}: {load_err}"
+            # Idempotent Postgres Loading (Main Table + Junction Tables)
+            try:
+                conflict_cols = ["id", "_valid_from"] if Model._conserve_history else ["id"]
+
+                if Model._full_load:
+                    update_into_db(schema=DatabaseSchema.ANALYTICS, table=table_name, df=main_df, if_table_exists="replace")
+                else:
+                    upsert_into_postgres(
+                        db_pool=db_pool,
+                        schema=DatabaseSchema.ANALYTICS,
+                        table_name=table_name,
+                        df=main_df,
+                        conflict_columns=conflict_cols
+                    )
+
+                for m2m_table, m2m_df in m2m_dfs.items():
+                    m2m_conflict = list(m2m_df.columns)
+                    upsert_into_postgres(
+                        db_pool=db_pool,
+                        schema=DatabaseSchema.ANALYTICS,
+                        table_name=m2m_table,
+                        df=m2m_df,
+                        conflict_columns=m2m_conflict,
+                        is_m2m=True
+                    )
+
+                # Checkpoints and Fallbacks
+                if task.is_fallback and task.event_id:
+                    update_fallback_event_status(
+                        db_pool, 
+                        task.event_id, 
+                        status="COMPLETED", 
+                        records_processed=len(main_df)
+                    )
+                else:
+                    raw_max = main_df["updated_at"].max() if "updated_at" in main_df.columns else None
+                    new_watermark: int = int(raw_max) if isinstance(raw_max, (int, float)) else task.start_watermark
+
+                    upsert_checkpoint(
+                        pool=db_pool,
+                        table_name=Model.__name__,
+                        current_watermark=new_watermark,
+                        last_id=0,
+                        layer="ANALYTICS",
+                        offset_val=0,
+                        run_id=None
+                    )
+                    upsert_fallback_checkpoint(
+                        pool=db_pool, 
+                        table_name=Model.__name__,
+                        layer='ANALYTICS', 
+                        fallback_watermark=new_watermark
+                    )
+
+            except Exception as load_err:
+                err_msg = f"Load failed for {Model.__name__}: {load_err}"
+                
+                run_error = str(load_err)
+                run_status = "FAILED"
+
+                log_to_discord(err_msg, AlertLevel.ERROR)
+                if task.is_fallback and task.event_id:
+                    update_fallback_event_status(db_pool, task.event_id, status="FAILED", error_message=err_msg)
+                continue
             
-            run_error = str(load_err)
-            run_status = "FAILED"
-
-            log_to_discord(err_msg, AlertLevel.ERROR)
-            if task.is_fallback and task.event_id:
-                update_fallback_event_status(db_pool, task.event_id, status="FAILED", error_message=err_msg)
-            continue
-        
+    except Exception as e:
+        run_error  = str(e)
+        run_status = "FAILED"
+    finally:
         complete_ingestion_run(db_pool, run_id, run_status, run_error)
-
-        # Checkpoints and Fallbacks
-        if task.is_fallback and task.event_id:
-            update_fallback_event_status(
-                db_pool, 
-                task.event_id, 
-                status="COMPLETED", 
-                records_processed=len(main_df)
-            )
-        else:
-            raw_max = main_df["updated_at"].max() if "updated_at" in main_df.columns else None
-            new_watermark: int = int(raw_max) if isinstance(raw_max, (int, float)) else task.start_watermark
-
-            upsert_checkpoint(
-                pool=db_pool,
-                table_name=Model.__name__,
-                current_watermark=new_watermark,
-                last_id=0,
-                layer="ANALYTICS",
-                offset_val=0,
-                run_id=None
-            )
-            upsert_fallback_checkpoint(
-                pool=db_pool, 
-                table_name=Model.__name__,
-                layer='ANALYTICS', 
-                fallback_watermark=new_watermark
-            )
