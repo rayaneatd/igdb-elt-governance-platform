@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Azure Market Insights — ELT Governance Dashboard</title>
+    <title>Azure Market Insights — ELT Governance & Analytics</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         /* Modern Micro-Interactions & Dashboard Enhancements */
         .toast-container {
@@ -117,25 +118,25 @@
     <div id="full-login-screen" class="full-screen-login">
         <div class="login-card">
             <div class="login-logo">🌐</div>
-            <h2>IGDB Governance</h2>
-            <p>Connexion requise pour accéder au Control Plane ELT</p>
+            <h2>IGDB Analytics & Governance</h2>
+            <p>Authentication required to access the ELT Control Plane & Dashboard</p>
 
             <form onsubmit="handleLoginSubmit(event)">
                 <div class="form-group">
-                    <label for="login-username">Identifiant</label>
-                    <input type="text" id="login-username" class="form-input" placeholder="admin ou visitor" required>
+                    <label for="login-username">Username</label>
+                    <input type="text" id="login-username" class="form-input" placeholder="admin or visitor" required>
                 </div>
                 <div class="form-group">
-                    <label for="login-password">Mot de passe</label>
+                    <label for="login-password">Password</label>
                     <input type="password" id="login-password" class="form-input" placeholder="••••••••" required>
                 </div>
                 <button type="submit" class="btn-aero btn-primary"
                     style="width:100%; padding:12px; margin-top:8px; font-size:14px;">
-                    🚀 Se Connecter
+                    🚀 Sign In
                 </button>
             </form>
             <div style="margin-top: 14px; font-size: 11px; color: var(--text-muted);">
-                Comptes de démo : <a href="#" onclick="fillPreset('admin', 'admin123'); return false;" style="color:#0078d7;">Admin</a> | <a href="#" onclick="fillPreset('visitor', 'visitor123'); return false;" style="color:#0078d7;">Viewer</a>
+                Preset accounts: <a href="#" onclick="fillPreset('admin', 'admin123'); return false;" style="color:#0078d7;">Admin</a> | <a href="#" onclick="fillPreset('visitor', 'visitor123'); return false;" style="color:#0078d7;">Viewer</a>
             </div>
         </div>
     </div>
@@ -148,8 +149,8 @@
                 <div class="logo-area">
                     <div class="logo-icon">🌐</div>
                     <div class="logo-text">
-                        <h1>IGDB ELT Governance</h1>
-                        <p>Azure Data Lake & PostgreSQL Control Plane</p>
+                        <h1>IGDB Market Insights & Governance</h1>
+                        <p>Azure Data Lake Gen2 & PostgreSQL Analytics Control Plane</p>
                     </div>
                 </div>
                 <div class="header-status">
@@ -159,53 +160,190 @@
                         <button class="btn-aero" id="btn-toggle-refresh" style="padding: 2px 8px; font-size:11px;" onclick="toggleAutoRefresh()">⏸ Pause</button>
                     </div>
                     <div id="user-profile-area" class="user-badge">
-                        <span id="user-info-text">Chargement compte...</span>
+                        <span id="user-info-text">Loading account...</span>
                     </div>
-                    <button class="btn-aero btn-primary" onclick="refreshCurrentTab(true)">🔄 Actualiser</button>
+                    <button class="btn-aero btn-primary" onclick="refreshCurrentTab(true)">🔄 Refresh</button>
                 </div>
             </header>
-
-            <!-- KPI Header Grid -->
-            <div class="kpi-grid">
-                <div class="kpi-card">
-                    <div class="kpi-title">Runs Totaux</div>
-                    <div class="kpi-value" id="kpi-total-runs">-</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-title">Succès / Échecs</div>
-                    <div class="kpi-value" id="kpi-success-failed">- / -</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-title">Fallbacks En Attente</div>
-                    <div class="kpi-value" id="kpi-pending-fallbacks" style="color: #f39c12;">-</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-title">Total Objets Ingérés</div>
-                    <div class="kpi-value" id="kpi-records-count" style="color: #00b4db;">-</div>
-                </div>
-            </div>
 
             <!-- Main Glass Panel -->
             <main class="main-panel">
                 <div class="tabs-bar">
-                    <button class="tab-btn active" onclick="switchTab('tab-runs', this)">🚀 Ingestion Runs</button>
+                    <button class="tab-btn active" onclick="switchTab('tab-analytics', this)">📊 Market Insights</button>
+                    <button class="tab-btn" onclick="switchTab('tab-runs', this)">🚀 Ingestion Runs</button>
                     <button class="tab-btn" onclick="switchTab('tab-checkpoints', this)">⚙️ Checkpoints & Fallback</button>
-                    <button class="tab-btn" onclick="switchTab('tab-batches', this)">📜 Logs de Batchs</button>
+                    <button class="tab-btn" onclick="switchTab('tab-batches', this)">📜 Batch Logs</button>
                     <button class="tab-btn" onclick="switchTab('tab-schema', this)">🔍 Schema Drift Audit</button>
                 </div>
 
+                <!-- ================================================================ -->
+                <!-- TAB 0: MARKET ANALYTICS & INSIGHTS -->
+                <!-- ================================================================ -->
+                <section id="tab-analytics" class="tab-content active">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+                        <div>
+                            <h3 style="font-size:18px; color:var(--text-main);">🎮 Video Game Market Intelligence</h3>
+                            <p style="font-size:12px; color:var(--text-muted);">Aggregated metrics computed on the PostgreSQL Analytics layer (SCD2)</p>
+                        </div>
+                        <button class="btn-aero" style="font-size:12px;" onclick="loadAnalyticsData(true)">⚡ Force Analytics Refresh</button>
+                    </div>
+
+                    <!-- Analytics Business KPIs -->
+                    <div class="analytics-kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-title">Cataloged Games</div>
+                            <div class="kpi-value" id="biz-kpi-total-games" style="color: #0078d7;">-</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-title">Rated Games</div>
+                            <div class="kpi-value" id="biz-kpi-rated-games" style="color: #2ecc71;">-</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-title">Avg User Rating</div>
+                            <div class="kpi-value" id="biz-kpi-avg-user" style="color: #00b4db;">-</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-title">Avg Critic Rating</div>
+                            <div class="kpi-value" id="biz-kpi-avg-critic" style="color: #9b59b6;">-</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-title">Genres & Platforms</div>
+                            <div class="kpi-value" id="biz-kpi-genres-platforms">- / -</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-title">Peak Release Year</div>
+                            <div class="kpi-value" id="biz-kpi-peak-year" style="color: #f39c12;">-</div>
+                        </div>
+                    </div>
+
+                    <!-- 2x2 Interactive Charts Grid -->
+                    <div class="analytics-charts-grid">
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <h4>🎯 Game Distribution by Genre</h4>
+                                <span class="chart-subtitle">Top 8 Genres</span>
+                            </div>
+                            <div class="chart-canvas-wrapper">
+                                <canvas id="chart-genres"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <h4>⭐ Top Rated Games</h4>
+                                <span class="chart-subtitle">Min. 30 votes</span>
+                            </div>
+                            <div class="chart-canvas-wrapper">
+                                <canvas id="chart-top-games"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <h4>📈 Release Trajectory by Year</h4>
+                                <span class="chart-subtitle">1990 — 2026</span>
+                            </div>
+                            <div class="chart-canvas-wrapper">
+                                <canvas id="chart-timeline"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <h4>🕹️ Top Platforms (Title Volume)</h4>
+                                <span class="chart-subtitle">Top 8 Platforms</span>
+                            </div>
+                            <div class="chart-canvas-wrapper">
+                                <canvas id="chart-platforms"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Game Explorer Section -->
+                    <div style="margin-top: 30px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                            <h3 style="font-size:16px; color:var(--text-main);">🔍 Interactive Game Explorer</h3>
+                            <span id="explorer-total-badge" class="badge" style="background:#e2e8f0; color:#475569;">0 games found</span>
+                        </div>
+
+                        <div class="filter-toolbar">
+                            <input type="text" id="explorer-search" class="filter-input" style="flex: 2; min-width: 220px;"
+                                placeholder="🔍 Search title (e.g., Witcher, Mario, Cyberpunk...)" oninput="onExplorerSearchInput()">
+                            <select id="explorer-genre" class="filter-select" style="flex: 1; min-width: 160px;" onchange="loadGamesExplorer(1)">
+                                <option value="">All genres</option>
+                            </select>
+                            <select id="explorer-sort" class="filter-select" style="flex: 1; min-width: 160px;" onchange="loadGamesExplorer(1)">
+                                <option value="rating">⭐ Highest rating</option>
+                                <option value="recent">📅 Most recent</option>
+                                <option value="hypes">🔥 Most hyped</option>
+                                <option value="name">🔤 Name A-Z</option>
+                            </select>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="aero-table">
+                                <thead>
+                                    <tr>
+                                        <th>Game Title</th>
+                                        <th>Overall Rating</th>
+                                        <th>Reviews</th>
+                                        <th>Year</th>
+                                        <th>Genres</th>
+                                        <th>Platforms</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="explorer-tbody">
+                                    <tr>
+                                        <td colspan="6" style="text-align:center;">Loading analytics data...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="pagination-bar">
+                            <span id="explorer-page-info">Page 1</span>
+                            <div class="pagination-controls">
+                                <button class="btn-aero" id="btn-prev-page" onclick="changeExplorerPage(-1)" disabled>◀ Previous</button>
+                                <button class="btn-aero" id="btn-next-page" onclick="changeExplorerPage(1)">Next ▶</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ================================================================ -->
                 <!-- TAB 1: Ingestion Runs -->
-                <section id="tab-runs" class="tab-content active">
+                <!-- ================================================================ -->
+                <section id="tab-runs" class="tab-content">
+                    <!-- KPI Header Grid -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-title">Total Runs</div>
+                            <div class="kpi-value" id="kpi-total-runs">-</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-title">Success / Failed</div>
+                            <div class="kpi-value" id="kpi-success-failed">- / -</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-title">Pending Fallbacks</div>
+                            <div class="kpi-value" id="kpi-pending-fallbacks" style="color: #f39c12;">-</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-title">Total Records Ingested</div>
+                            <div class="kpi-value" id="kpi-records-count" style="color: #00b4db;">-</div>
+                        </div>
+                    </div>
+
                     <div class="filter-toolbar">
                         <input type="text" id="filter-runs-search" class="filter-input"
-                            placeholder="🔍 Rechercher Run ID / Erreur..." oninput="renderRunsTable()">
+                            placeholder="🔍 Search Run ID / Error..." oninput="renderRunsTable()">
                         <select id="filter-runs-status" class="filter-select" onchange="renderRunsTable()">
-                            <option value="ALL">Tous les statuts</option>
+                            <option value="ALL">All statuses</option>
                             <option value="COMPLETED">COMPLETED</option>
                             <option value="RUNNING">RUNNING</option>
                             <option value="FAILED">FAILED</option>
                         </select>
-                        <span id="runs-count-badge" class="badge" style="background:#e2e8f0; color:#475569;">0 éléments</span>
+                        <span id="runs-count-badge" class="badge" style="background:#e2e8f0; color:#475569;">0 items</span>
                     </div>
                     <div class="table-responsive">
                         <table class="aero-table">
@@ -213,27 +351,29 @@
                                 <tr>
                                     <th class="sortable" onclick="sortData('runs', 'run_id')">Run ID ⇕</th>
                                     <th class="sortable" onclick="sortData('runs', 'layer')">Layer ⇕</th>
-                                    <th class="sortable" onclick="sortData('runs', 'status')">Statut ⇕</th>
-                                    <th class="sortable" onclick="sortData('runs', 'started_at')">Début ⇕</th>
-                                    <th class="sortable" onclick="sortData('runs', 'completed_at')">Fin ⇕</th>
-                                    <th class="sortable" onclick="sortData('runs', 'duration_seconds')">Durée ⇕</th>
-                                    <th>Message d'erreur</th>
+                                    <th class="sortable" onclick="sortData('runs', 'status')">Status ⇕</th>
+                                    <th class="sortable" onclick="sortData('runs', 'started_at')">Started At ⇕</th>
+                                    <th class="sortable" onclick="sortData('runs', 'completed_at')">Completed At ⇕</th>
+                                    <th class="sortable" onclick="sortData('runs', 'duration_seconds')">Duration ⇕</th>
+                                    <th>Error Message</th>
                                 </tr>
                             </thead>
                             <tbody id="runs-tbody">
                                 <tr>
-                                    <td colspan="7" style="text-align:center;">Chargement...</td>
+                                    <td colspan="7" style="text-align:center;">Loading...</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </section>
 
+                <!-- ================================================================ -->
                 <!-- TAB 2: Checkpoints & Event-Driven Fallback Queue -->
+                <!-- ================================================================ -->
                 <section id="tab-checkpoints" class="tab-content">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                        <h3 style="font-size:16px; color:var(--text-main);">📋 File d'Attente des Événements Fallback</h3>
-                        <button class="btn-aero btn-warning" onclick="openFallbackEventModal()">➕ Créer un Événement Fallback</button>
+                        <h3 style="font-size:16px; color:var(--text-main);">📋 Fallback Event Queue</h3>
+                        <button class="btn-aero btn-warning" onclick="openFallbackEventModal()">➕ Create Fallback Event</button>
                     </div>
 
                     <div class="table-responsive" style="margin-bottom: 24px;">
@@ -242,155 +382,144 @@
                                 <tr>
                                     <th>Event ID</th>
                                     <th>Table</th>
-                                    <th>Start Watermark (Début)</th>
-                                    <th>End Watermark (Fin)</th>
-                                    <th>Statut</th>
-                                    <th>Objets Traités</th>
-                                    <th>Erreur</th>
-                                    <th>Créé Le</th>
+                                    <th>Start Watermark</th>
+                                    <th>End Watermark</th>
+                                    <th>Status</th>
+                                    <th>Processed Records</th>
+                                    <th>Error</th>
+                                    <th>Created At</th>
                                 </tr>
                             </thead>
                             <tbody id="fallback-events-tbody">
                                 <tr>
-                                    <td colspan="8" style="text-align:center;">Chargement de la file d'attente...</td>
+                                    <td colspan="8" style="text-align:center;">Loading replay events...</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
-                    <h3 style="font-size:16px; color:var(--text-main); margin-bottom:12px;">📍 Index des Checkpoints Incrémentaux Continu</h3>
-                    <div class="filter-toolbar">
-                        <input type="text" id="filter-ckpt-search" class="filter-input"
-                            placeholder="🔍 Rechercher Table..." oninput="renderCheckpointsTable()">
-                        <select id="filter-ckpt-status" class="filter-select" onchange="renderCheckpointsTable()">
-                            <option value="ALL">Tous les modes</option>
-                            <option value="INCRÉMENTAL">INCRÉMENTAL</option>
-                            <option value="OVERRIDE">OVERRIDE READY</option>
-                        </select>
-                        <span id="ckpt-count-badge" class="badge" style="background:#e2e8f0; color:#475569;">0 tables</span>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                        <h3 style="font-size:16px; color:var(--text-main);">⚙️ Incremental Checkpoints per Table</h3>
                     </div>
+
                     <div class="table-responsive">
                         <table class="aero-table">
                             <thead>
                                 <tr>
                                     <th class="sortable" onclick="sortData('checkpoints', 'table_name')">Table ⇕</th>
-                                    <th class="sortable" onclick="sortData('checkpoints', 'current_watermark')">Watermark Actuel ⇕</th>
-                                    <th class="sortable" onclick="sortData('checkpoints', 'fallback_watermark')">Fallback Safety ⇕</th>
-                                    <th class="sortable" onclick="sortData('checkpoints', 'last_id')">Dernier ID ⇕</th>
-                                    <th class="sortable" onclick="sortData('checkpoints', 'offset_val')">Offset ⇕</th>
-                                    <th>Mode</th>
-                                    <th class="sortable" onclick="sortData('checkpoints', 'updated_at')">Dernière Maj ⇕</th>
-                                    <th>Action Quick Replay</th>
+                                    <th>Layer</th>
+                                    <th>Current Watermark</th>
+                                    <th>Fallback Watermark</th>
+                                    <th>Last ID</th>
+                                    <th>Offset</th>
+                                    <th>Override Active?</th>
+                                    <th>Last Updated</th>
+                                    <th>Action (Admin)</th>
                                 </tr>
                             </thead>
                             <tbody id="checkpoints-tbody">
                                 <tr>
-                                    <td colspan="8" style="text-align:center;">Chargement...</td>
+                                    <td colspan="9" style="text-align:center;">Loading...</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </section>
 
+                <!-- ================================================================ -->
                 <!-- TAB 3: Batch Logs -->
+                <!-- ================================================================ -->
                 <section id="tab-batches" class="tab-content">
                     <div class="filter-toolbar">
-                        <input type="text" id="filter-batches-search" class="filter-input"
-                            placeholder="🔍 Rechercher Table / Requête..." oninput="renderBatchesTable()">
+                        <select id="filter-batches-table" class="filter-select" onchange="renderBatchesTable()">
+                            <option value="ALL">All tables</option>
+                        </select>
                         <select id="filter-batches-status" class="filter-select" onchange="renderBatchesTable()">
-                            <option value="ALL">Tous les statuts</option>
+                            <option value="ALL">All statuses</option>
                             <option value="SUCCESS">SUCCESS</option>
                             <option value="FAILED">FAILED</option>
                         </select>
-                        <span id="batches-count-badge" class="badge" style="background:#e2e8f0; color:#475569;">0 batchs</span>
+                        <span id="batches-count-badge" class="badge" style="background:#e2e8f0; color:#475569;">0 batches</span>
                     </div>
                     <div class="table-responsive">
                         <table class="aero-table">
                             <thead>
                                 <tr>
-                                    <th class="sortable" onclick="sortData('batches', 'batch_id')">ID ⇕</th>
-                                    <th class="sortable" onclick="sortData('batches', 'table_name')">Table ⇕</th>
-                                    <th class="sortable" onclick="sortData('batches', 'status')">Statut ⇕</th>
-                                    <th class="sortable" onclick="sortData('batches', 'cursor_value')">Cursor Value ⇕</th>
-                                    <th class="sortable" onclick="sortData('batches', 'offset_value')">Offset ⇕</th>
-                                    <th class="sortable" onclick="sortData('batches', 'records_count')">Objets ⇕</th>
-                                    <th class="sortable" onclick="sortData('batches', 'duration_ms')">Durée (ms) ⇕</th>
-                                    <th>Requête Apicalypse</th>
-                                    <th class="sortable" onclick="sortData('batches', 'created_at')">Horodatage ⇕</th>
+                                    <th class="sortable" onclick="sortData('batches', 'batch_id')">Batch ID ⇕</th>
+                                    <th>Table</th>
+                                    <th>Layer</th>
+                                    <th>Status</th>
+                                    <th>Records</th>
+                                    <th>Duration (ms)</th>
+                                    <th>Cursor / Offset</th>
+                                    <th>IGDB Query</th>
+                                    <th>Date</th>
                                 </tr>
                             </thead>
                             <tbody id="batches-tbody">
                                 <tr>
-                                    <td colspan="9" style="text-align:center;">Chargement...</td>
+                                    <td colspan="9" style="text-align:center;">Loading...</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </section>
 
+                <!-- ================================================================ -->
                 <!-- TAB 4: Schema Drift Audit -->
+                <!-- ================================================================ -->
                 <section id="tab-schema" class="tab-content">
-                    <div class="filter-toolbar">
-                        <input type="text" id="filter-schema-search" class="filter-input"
-                            placeholder="🔍 Rechercher Table / Dérive..." oninput="renderSchemaTable()">
-                        <span id="schema-count-badge" class="badge" style="background:#e2e8f0; color:#475569;">0 entrées</span>
-                    </div>
                     <div class="table-responsive">
                         <table class="aero-table">
                             <thead>
                                 <tr>
-                                    <th class="sortable" onclick="sortData('schema', 'id')">ID ⇕</th>
+                                    <th>ID</th>
                                     <th class="sortable" onclick="sortData('schema', 'table_name')">Table ⇕</th>
-                                    <th>Détail Dérive Colonnes</th>
-                                    <th class="sortable" onclick="sortData('schema', 'schema_hash')">Signature Hash ⇕</th>
-                                    <th class="sortable" onclick="sortData('schema', 'detected_at')">Détecté Le ⇕</th>
-                                    <th>Run ID</th>
-                                    <th>Statut</th>
+                                    <th>Detected At</th>
+                                    <th>Drifted / Modified Columns</th>
+                                    <th>Status</th>
+                                    <th>Action Taken</th>
+                                    <th>Signature Hash</th>
                                 </tr>
                             </thead>
                             <tbody id="schema-tbody">
                                 <tr>
-                                    <td colspan="7" style="text-align:center;">Chargement...</td>
+                                    <td colspan="7" style="text-align:center;">Loading...</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </section>
+
             </main>
         </div>
     </div>
 
-    <!-- Modal Trigger Fallback Event -->
-    <div class="modal-overlay" id="fallback-modal">
+    <!-- MODAL POPUP: Create Fallback Event -->
+    <div id="fallback-modal" class="modal-overlay">
         <div class="modal-card">
-            <h3 id="fallback-modal-title">Planifier un Événement Fallback</h3>
-            <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">
-                Définissez une plage temporelle (timestamps Unix) à rejouer pour la table sélectionnée. Le pipeline traitera cet intervalle en priorité absolue.
+            <h3 style="margin-bottom: 14px; font-size:18px;">➕ Trigger Fallback Replay</h3>
+            <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:18px;">
+                Queues a priority event in the FIFO queue. The pipeline will ingest this historical time window first without mutating the main continuous checkpoint.
             </p>
             <div class="form-group">
-                <label for="modal-fallback-table">Table Cible</label>
-                <select id="modal-fallback-table" class="form-input">
-                    <option value="GameSchema">GameSchema (IGDB Games)</option>
-                    <option value="CompanySchema">CompanySchema</option>
-                    <option value="GenreSchema">GenreSchema</option>
-                    <option value="PlatformSchema">PlatformSchema</option>
-                    <option value="ReleaseDateSchema">ReleaseDateSchema</option>
-                </select>
+                <label for="modal-fallback-table">Target Table</label>
+                <select id="modal-fallback-table" class="form-input"></select>
             </div>
             <div class="form-group">
-                <label for="modal-start-watermark">Start Watermark (Timestamp Unix Début)</label>
+                <label for="modal-start-watermark">Start Watermark (Unix Timestamp)</label>
                 <input type="number" id="modal-start-watermark" class="form-input"
-                    placeholder="ex: 1577836800 (1 Jan 2020)">
+                    placeholder="e.g.: 1577836800 (Jan 1, 2020)">
             </div>
             <div class="form-group">
-                <label for="modal-end-watermark">End Watermark (Timestamp Unix Fin)</label>
+                <label for="modal-end-watermark">End Watermark (Unix Timestamp)</label>
                 <input type="number" id="modal-end-watermark" class="form-input"
-                    placeholder="ex: 1609459200 (1 Jan 2021)">
+                    placeholder="e.g.: 1609459200 (Jan 1, 2021)">
             </div>
             <div class="modal-actions">
                 <button class="btn-aero" style="background: #cbd5e1; color: #334155;"
-                    onclick="closeFallbackModal()">Annuler</button>
-                <button class="btn-aero btn-warning" onclick="submitFallbackEvent()">🚀 Créer Événement (Admin)</button>
+                    onclick="closeFallbackModal()">Cancel</button>
+                <button class="btn-aero btn-warning" onclick="submitFallbackEvent()">🚀 Create Event (Admin)</button>
             </div>
         </div>
     </div>
@@ -399,10 +528,12 @@
         let rawData = { runs: [], checkpoints: [], batches: [], schema: [], fallbackEvents: [] };
         let sortState = { key: null, asc: true };
         let currentUser = { logged_in: false, username: null, role: null };
-        let currentTab = 'tab-runs';
+        let currentTab = 'tab-analytics';
         let autoRefreshInterval = null;
         let isAutoRefreshActive = true;
         let refreshSecondsLeft = 10;
+        let chartInstances = {};
+        let explorerState = { page: 1, limit: 20, total: 0, searchTimer: null };
 
         function showToast(message, type = 'info') {
             const container = document.getElementById('toast-container');
@@ -417,12 +548,12 @@
             }, 3500);
         }
 
-        function copyText(text, label = 'Élément') {
+        function copyText(text, label = 'Item') {
             if (!text) return;
             navigator.clipboard.writeText(text).then(() => {
-                showToast(`${label} copié dans le presse-papier !`, 'success');
+                showToast(`${label} copied to clipboard!`, 'success');
             }).catch(() => {
-                showToast(`Échec copie dans le presse-papier`, 'error');
+                showToast(`Failed to copy to clipboard`, 'error');
             });
         }
 
@@ -438,13 +569,13 @@
         function formatDate(tsStr) {
             if (!tsStr) return '-';
             const d = new Date(tsStr);
-            return d.toLocaleString('fr-FR');
+            return d.toLocaleString('en-US');
         }
 
         function formatUnix(ts) {
             if (!ts) return '0';
             const d = new Date(ts * 1000);
-            return `${ts} (${d.toLocaleDateString('fr-FR')})`;
+            return `${ts} (${d.toLocaleDateString('en-US')})`;
         }
 
         function fillPreset(username, password) {
@@ -466,19 +597,19 @@
 
                 const data = await res.json();
                 if (res.ok) {
-                    showToast('Connexion réussie', 'success');
+                    showToast('Login successful', 'success');
                     checkUserSession();
                 } else {
-                    showToast(data.error || 'Identifiants invalides', 'error');
+                    showToast(data.error || 'Invalid credentials', 'error');
                 }
             } catch (e) {
-                showToast('Erreur connexion: ' + e, 'error');
+                showToast('Login error: ' + e, 'error');
             }
         }
 
         async function logout() {
             await fetch('/api/logout', { method: 'POST' });
-            showToast('Déconnexion effectuée', 'info');
+            showToast('Signed out successfully', 'info');
             checkUserSession();
         }
 
@@ -499,7 +630,7 @@
                     profileArea.innerHTML = `
                         <span>👤 <strong>${currentUser.username}</strong></span>
                         <span class="user-role-tag ${roleClass}">${currentUser.role}</span>
-                        <button class="btn-aero" style="padding: 2px 8px; font-size:11px; margin-left:6px;" onclick="logout()">Déconnexion</button>
+                        <button class="btn-aero" style="padding: 2px 8px; font-size:11px; margin-left:6px;" onclick="logout()">Sign Out</button>
                     `;
                     loadDynamicTables();
                     loadStats();
@@ -535,7 +666,6 @@
                 sortState.asc = !sortState.asc;
             } else {
                 sortState.key = key;
-                sortState.asc = true;
             }
 
             rawData[section].sort((a, b) => {
@@ -558,21 +688,27 @@
             try {
                 const res = await fetch('/api/stats');
                 const data = await res.json();
-                document.getElementById('kpi-total-runs').textContent = data.total_runs || 0;
-                document.getElementById('kpi-success-failed').textContent = `${data.successful_runs || 0} / ${data.failed_runs || 0}`;
-                document.getElementById('kpi-pending-fallbacks').textContent = data.pending_fallbacks || 0;
-                document.getElementById('kpi-records-count').textContent = (data.total_records_ingested || 0).toLocaleString();
+                const totalRunsEl = document.getElementById('kpi-total-runs');
+                if (totalRunsEl) totalRunsEl.textContent = data.total_runs || 0;
+                const sfEl = document.getElementById('kpi-success-failed');
+                if (sfEl) sfEl.textContent = `${data.successful_runs || 0} / ${data.failed_runs || 0}`;
+                const pfEl = document.getElementById('kpi-pending-fallbacks');
+                if (pfEl) pfEl.textContent = data.pending_fallbacks || 0;
+                const rcEl = document.getElementById('kpi-records-count');
+                if (rcEl) rcEl.textContent = (data.total_records_ingested || 0).toLocaleString();
             } catch (e) {
                 console.error(e);
             }
         }
 
-        // Lazy Tab-based Loading: only fetch data for the active view
+        // Lazy Tab-based Loading
         async function refreshCurrentTab(showToastNotice = false) {
             if (!currentUser.logged_in) return;
-            loadStats();
 
-            if (currentTab === 'tab-runs') {
+            if (currentTab === 'tab-analytics') {
+                await loadAnalyticsData();
+            } else if (currentTab === 'tab-runs') {
+                loadStats();
                 await loadRuns();
             } else if (currentTab === 'tab-checkpoints') {
                 await Promise.all([loadCheckpoints(), loadFallbackEvents()]);
@@ -583,7 +719,7 @@
             }
 
             if (showToastNotice) {
-                showToast('Données actualisées', 'info');
+                showToast('Data refreshed', 'info');
             }
         }
 
@@ -598,12 +734,10 @@
                 btn.textContent = '⏸ Pause';
                 refreshSecondsLeft = 10;
                 label.textContent = 'Auto: 10s';
-                showToast('Rafraîchissement automatique activé', 'info');
             } else {
                 dot.classList.add('paused');
-                btn.textContent = '▶ Reprendre';
-                label.textContent = 'Pause';
-                showToast('Rafraîchissement automatique en pause', 'info');
+                btn.textContent = '▶ Resume';
+                label.textContent = 'Paused';
             }
         }
 
@@ -611,15 +745,14 @@
             if (autoRefreshInterval) clearInterval(autoRefreshInterval);
             refreshSecondsLeft = 10;
             autoRefreshInterval = setInterval(() => {
-                if (!isAutoRefreshActive || !currentUser.logged_in) return;
+                if (!isAutoRefreshActive) return;
                 refreshSecondsLeft--;
+                const label = document.getElementById('refresh-timer-label');
+                if (label) label.textContent = `Auto: ${refreshSecondsLeft}s`;
+
                 if (refreshSecondsLeft <= 0) {
                     refreshSecondsLeft = 10;
                     refreshCurrentTab(false);
-                }
-                const label = document.getElementById('refresh-timer-label');
-                if (label && isAutoRefreshActive) {
-                    label.textContent = `Auto: ${refreshSecondsLeft}s`;
                 }
             }, 1000);
         }
@@ -631,222 +764,600 @@
             }
         }
 
+        // ================================================================
+        // MARKET ANALYTICS DATA & CHART VISUALIZATIONS
+        // ================================================================
+
+        async function loadAnalyticsData(forceRefresh = false) {
+            const refreshParam = forceRefresh ? '?refresh=true' : '';
+            try {
+                // 1. Fetch Analytics KPIs
+                const kpisRes = await fetch(`/api/analytics/kpis${refreshParam}`);
+                if (kpisRes.ok) {
+                    const kpis = await kpisRes.json();
+                    document.getElementById('biz-kpi-total-games').textContent = (kpis.total_games || 0).toLocaleString();
+                    document.getElementById('biz-kpi-rated-games').textContent = (kpis.rated_games || 0).toLocaleString();
+                    document.getElementById('biz-kpi-avg-user').textContent = kpis.avg_user_rating ? `${kpis.avg_user_rating} / 100` : '-';
+                    document.getElementById('biz-kpi-avg-critic').textContent = kpis.avg_critic_rating ? `${kpis.avg_critic_rating} / 100` : '-';
+                    document.getElementById('biz-kpi-genres-platforms').textContent = `${kpis.total_genres || 0} / ${kpis.total_platforms || 0}`;
+                    document.getElementById('biz-kpi-peak-year').textContent = kpis.top_release_year || '-';
+                }
+
+                // 2. Fetch and render all charts in parallel
+                const [genresRes, topGamesRes, timelineRes, platformsRes] = await Promise.all([
+                    fetch(`/api/analytics/genres?limit=8${refreshParam}`),
+                    fetch(`/api/analytics/top-games?limit=8`),
+                    fetch(`/api/analytics/timeline${refreshParam}`),
+                    fetch(`/api/analytics/platforms?limit=8${refreshParam}`)
+                ]);
+
+                if (genresRes.ok) {
+                    const genres = await genresRes.json();
+                    renderGenresChart(genres);
+                    populateGenreDropdown(genres);
+                }
+                if (topGamesRes.ok) renderTopGamesChart(await topGamesRes.json());
+                if (timelineRes.ok) renderTimelineChart(await timelineRes.json());
+                if (platformsRes.ok) renderPlatformsChart(await platformsRes.json());
+
+                // 3. Load Explorer Table
+                await loadGamesExplorer(explorerState.page);
+
+                if (forceRefresh) {
+                    showToast('Analytics metrics recomputed!', 'success');
+                }
+            } catch (e) {
+                console.error("Error loading analytics data:", e);
+            }
+        }
+
+        function populateGenreDropdown(genres) {
+            const select = document.getElementById('explorer-genre');
+            if (!select || select.children.length > 1) return;
+            genres.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = g.genre_name;
+                opt.textContent = g.genre_name;
+                select.appendChild(opt);
+            });
+        }
+
+        // Chart 1: Genres Doughnut
+        function renderGenresChart(data) {
+            const ctx = document.getElementById('chart-genres');
+            if (!ctx) return;
+            if (chartInstances.genres) chartInstances.genres.destroy();
+
+            const labels = data.map(d => d.genre_name);
+            const counts = data.map(d => d.game_count);
+
+            const colors = [
+                '#0078d7', '#00b4db', '#2ecc71', '#9b59b6',
+                '#f39c12', '#e74c3c', '#1abc9c', '#34495e'
+            ];
+
+            chartInstances.genres = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: colors,
+                        borderColor: '#ffffff',
+                        borderWidth: 2,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { boxWidth: 12, font: { size: 11, family: 'Segoe UI' }, color: '#0c2340' }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` ${ctx.label}: ${ctx.raw.toLocaleString()} games`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Chart 2: Top Rated Games Horizontal Bar
+        function renderTopGamesChart(data) {
+            const ctx = document.getElementById('chart-top-games');
+            if (!ctx) return;
+            if (chartInstances.topGames) chartInstances.topGames.destroy();
+
+            const labels = data.map(d => d.name.length > 22 ? d.name.substring(0, 20) + '...' : d.name);
+            const ratings = data.map(d => d.rating);
+
+            chartInstances.topGames = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'User Rating',
+                        data: ratings,
+                        backgroundColor: 'rgba(46, 204, 113, 0.75)',
+                        borderColor: '#27ae60',
+                        borderWidth: 1.5,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            min: 80,
+                            max: 100,
+                            ticks: { color: '#4a6572', font: { size: 11 } },
+                            grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                        },
+                        y: {
+                            ticks: { color: '#0c2340', font: { size: 11, weight: '600' } },
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` Rating: ${ctx.raw} / 100`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Chart 3: Timeline Area Line Chart
+        function renderTimelineChart(data) {
+            const ctx = document.getElementById('chart-timeline');
+            if (!ctx) return;
+            if (chartInstances.timeline) chartInstances.timeline.destroy();
+
+            const labels = data.map(d => d.year);
+            const counts = data.map(d => d.games_count);
+
+            const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 250);
+            gradient.addColorStop(0, 'rgba(0, 180, 219, 0.55)');
+            gradient.addColorStop(1, 'rgba(0, 180, 219, 0.0)');
+
+            chartInstances.timeline = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Game Releases',
+                        data: counts,
+                        borderColor: '#0078d7',
+                        borderWidth: 2.5,
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 2,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#0078d7'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            ticks: { maxTicksLimit: 12, color: '#4a6572', font: { size: 10 } },
+                            grid: { display: false }
+                        },
+                        y: {
+                            ticks: { color: '#4a6572', font: { size: 10 } },
+                            grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` ${ctx.raw.toLocaleString()} games released`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Chart 4: Platforms Bar Chart
+        function renderPlatformsChart(data) {
+            const ctx = document.getElementById('chart-platforms');
+            if (!ctx) return;
+            if (chartInstances.platforms) chartInstances.platforms.destroy();
+
+            const labels = data.map(d => d.platform_name.length > 18 ? d.platform_name.substring(0, 16) + '...' : d.platform_name);
+            const counts = data.map(d => d.game_count);
+
+            chartInstances.platforms = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Supported Titles',
+                        data: counts,
+                        backgroundColor: 'rgba(0, 120, 215, 0.72)',
+                        borderColor: '#0052d4',
+                        borderWidth: 1.5,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            ticks: { color: '#0c2340', font: { size: 10.5, weight: '600' } },
+                            grid: { display: false }
+                        },
+                        y: {
+                            ticks: { color: '#4a6572', font: { size: 10 } },
+                            grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` ${ctx.raw.toLocaleString()} supported titles`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ================================================================
+        // INTERACTIVE GAME EXPLORER TABLE & SEARCH
+        // ================================================================
+
+        function onExplorerSearchInput() {
+            if (explorerState.searchTimer) clearTimeout(explorerState.searchTimer);
+            explorerState.searchTimer = setTimeout(() => {
+                loadGamesExplorer(1);
+            }, 300);
+        }
+
+        async function loadGamesExplorer(page = 1) {
+            explorerState.page = page;
+            const search = document.getElementById('explorer-search').value.trim();
+            const sort = document.getElementById('explorer-sort').value;
+            const offset = (page - 1) * explorerState.limit;
+
+            let url = `/api/analytics/games?sort_by=${sort}&limit=${explorerState.limit}&offset=${offset}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+
+            const tbody = document.getElementById('explorer-tbody');
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:18px;">Loading games...</td></tr>`;
+
+            try {
+                const res = await fetch(url);
+                if (res.ok) {
+                    const data = await res.json();
+                    explorerState.total = data.total;
+                    renderExplorerTable(data.items);
+                    updateExplorerPagination(data.total, page);
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#e74c3c;">Error loading data.</td></tr>`;
+                }
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#e74c3c;">Network error: ${e}</td></tr>`;
+            }
+        }
+
+        function renderExplorerTable(games) {
+            const tbody = document.getElementById('explorer-tbody');
+            if (!games || games.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No games found matching the selected filters.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = games.map(g => {
+                let ratingHtml = '<span style="color:#94a3b8;">Unrated</span>';
+                if (g.rating !== null && g.rating !== undefined) {
+                    const rClass = g.rating >= 80 ? 'rating-high' : (g.rating >= 60 ? 'rating-mid' : 'rating-low');
+                    ratingHtml = `<span class="rating-pill ${rClass}">${g.rating}</span>`;
+                }
+
+                const genresHtml = (g.genre_names && g.genre_names.length)
+                    ? g.genre_names.slice(0, 3).map(gn => `<span class="tag-pill">${gn}</span>`).join('') + (g.genre_names.length > 3 ? '...' : '')
+                    : '-';
+
+                const platformsHtml = (g.platform_names && g.platform_names.length)
+                    ? g.platform_names.slice(0, 3).map(pn => `<span class="tag-pill" style="background:rgba(46,204,113,0.12); color:#27ae60; border-color:rgba(46,204,113,0.3);">${pn}</span>`).join('') + (g.platform_names.length > 3 ? '...' : '')
+                    : '-';
+
+                return `
+                <tr>
+                    <td><strong>${g.name}</strong></td>
+                    <td>${ratingHtml}</td>
+                    <td>${g.rating_count ? g.rating_count.toLocaleString() : '-'}</td>
+                    <td>${g.release_year || '-'}</td>
+                    <td>${genresHtml}</td>
+                    <td>${platformsHtml}</td>
+                </tr>
+                `;
+            }).join('');
+        }
+
+        function updateExplorerPagination(total, page) {
+            const totalPages = Math.ceil(total / explorerState.limit) || 1;
+            document.getElementById('explorer-total-badge').textContent = `${total.toLocaleString()} games indexed`;
+            document.getElementById('explorer-page-info').textContent = `Page ${page} of ${totalPages} (${total.toLocaleString()} results)`;
+            document.getElementById('btn-prev-page').disabled = page <= 1;
+            document.getElementById('btn-next-page').disabled = page >= totalPages;
+        }
+
+        function changeExplorerPage(delta) {
+            const newPage = explorerState.page + delta;
+            if (newPage >= 1) {
+                loadGamesExplorer(newPage);
+            }
+        }
+
+        // ================================================================
+        // GOVERNANCE VIEWS & TABLES
+        // ================================================================
+
         async function loadRuns() {
             try {
-                const res = await fetch('/api/runs');
-                rawData.runs = await res.json();
-                renderRunsTable();
-            } catch (e) { console.error(e); }
+                const res = await fetch('/api/runs?limit=50');
+                if (res.ok) {
+                    rawData.runs = await res.json();
+                    renderRunsTable();
+                }
+            } catch (e) {
+                console.error(e);
+            }
         }
 
         function renderRunsTable() {
             const search = document.getElementById('filter-runs-search').value.toLowerCase();
-            const status = document.getElementById('filter-runs-status').value;
+            const statusFilter = document.getElementById('filter-runs-status').value;
+            const tbody = document.getElementById('runs-tbody');
 
             const filtered = rawData.runs.filter(r => {
-                const matchSearch = r.run_id.toLowerCase().includes(search) || (r.error_message || '').toLowerCase().includes(search);
-                const matchStatus = status === 'ALL' || r.status === status;
-                return matchSearch && matchStatus;
+                const matchesSearch = !search ||
+                    r.run_id.toLowerCase().includes(search) ||
+                    (r.error_message && r.error_message.toLowerCase().includes(search));
+                const matchesStatus = statusFilter === 'ALL' || r.status === statusFilter;
+                return matchesSearch && matchesStatus;
             });
 
-            document.getElementById('runs-count-badge').textContent = `${filtered.length} élément(s)`;
-            const tbody = document.getElementById('runs-tbody');
-            if (!filtered.length) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Aucun run correspondant.</td></tr>';
+            document.getElementById('runs-count-badge').textContent = `${filtered.length} runs`;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;">No runs found.</td></tr>`;
                 return;
             }
+
             tbody.innerHTML = filtered.map(r => {
-                const badgeClass = r.status === 'COMPLETED' ? 'badge-success' : (r.status === 'RUNNING' ? 'badge-running' : 'badge-failed');
-                const shortId = r.run_id.substring(0, 8);
+                let badgeClass = 'badge-running';
+                if (r.status === 'COMPLETED') badgeClass = 'badge-success';
+                if (r.status === 'FAILED') badgeClass = 'badge-failed';
+
                 return `
                 <tr>
                     <td>
-                        <code>${shortId}...</code>
-                        <button class="btn-copy" onclick="copyText('${r.run_id}', 'Run ID')">📋</button>
+                        <code>${r.run_id}</code>
+                        <button class="btn-copy" onclick="copyText('${r.run_id}', 'Run ID')">Copy</button>
                     </td>
-                    <td><span class="badge" style="background:#e0f7fa; color:#006064;">${r.layer}</span></td>
+                    <td><strong>${r.layer}</strong></td>
                     <td><span class="badge ${badgeClass}">${r.status}</span></td>
                     <td>${formatDate(r.started_at)}</td>
                     <td>${formatDate(r.completed_at)}</td>
-                    <td>${r.duration_seconds !== null ? r.duration_seconds + 's' : '-'}</td>
-                    <td style="color:#d32f2f;">${r.error_message || '-'}</td>
+                    <td>${r.duration_seconds !== null ? r.duration_seconds + ' s' : '-'}</td>
+                    <td style="color: #d32f2f;">${r.error_message || '-'}</td>
                 </tr>
-            `;
+                `;
             }).join('');
         }
 
         async function loadCheckpoints() {
             try {
                 const res = await fetch('/api/checkpoints');
-                rawData.checkpoints = await res.json();
-                renderCheckpointsTable();
-            } catch (e) { console.error(e); }
+                if (res.ok) {
+                    rawData.checkpoints = await res.json();
+                    renderCheckpointsTable();
+                }
+            } catch (e) {
+                console.error(e);
+            }
         }
 
         function renderCheckpointsTable() {
-            const search = (document.getElementById('filter-ckpt-search')?.value || '').toLowerCase();
-            const status = document.getElementById('filter-ckpt-status')?.value || 'ALL';
-
-            const filtered = rawData.checkpoints.filter(c => {
-                const matchSearch = c.table_name.toLowerCase().includes(search);
-                const mode = c.is_override_active ? 'OVERRIDE' : 'INCRÉMENTAL';
-                const matchStatus = status === 'ALL' || mode === status;
-                return matchSearch && matchStatus;
-            });
-
-            document.getElementById('ckpt-count-badge').textContent = `${filtered.length} table(s)`;
             const tbody = document.getElementById('checkpoints-tbody');
-            if (!filtered.length) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Aucun checkpoint correspondant.</td></tr>';
+            if (rawData.checkpoints.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;">No checkpoints found.</td></tr>`;
                 return;
             }
 
-            const isAdmin = currentUser.logged_in && currentUser.role === 'ADMIN';
+            tbody.innerHTML = rawData.checkpoints.map(c => {
+                const isOverridden = c.is_override_active;
+                const statusBadge = isOverridden
+                    ? '<span class="badge badge-override">REPLAY ACTIVE</span>'
+                    : '<span class="badge badge-success">CONTINUOUS</span>';
 
-            tbody.innerHTML = filtered.map(c => `
-            <tr>
-                <td><strong>${c.table_name}</strong></td>
-                <td>${formatUnix(c.current_watermark)}</td>
-                <td>${formatUnix(c.fallback_watermark)}</td>
-                <td>${c.last_id}</td>
-                <td>${c.offset_val}</td>
-                <td>
-                    ${c.is_override_active ?
-                    '<span class="badge badge-override">OVERRIDE READY</span>' :
-                    '<span class="badge badge-success">INCRÉMENTAL</span>'}
-                </td>
-                <td>${formatDate(c.updated_at)}</td>
-                <td>
-                    ${isAdmin ?
-                    `<button class="btn-aero btn-warning" style="padding:4px 10px; font-size:12px;" onclick="openFallbackEventModal('${c.table_name}', ${c.current_watermark})">⚡ Fallback</button>` :
-                    `<span class="badge badge-disabled" title="Seul un Administrateur peut déclencher un fallback">🔒 Admin</span>`}
-                </td>
-            </tr>
-        `).join('');
+                let actionHtml = '';
+                if (currentUser.role === 'ADMIN') {
+                    if (isOverridden) {
+                        actionHtml = `<button class="btn-aero" style="background:#cbd5e1; color:#334155; padding:4px 8px; font-size:11px;" onclick="toggleCheckpointOverride('${c.table_name}', false)">Disable Override</button>`;
+                    } else {
+                        actionHtml = `<button class="btn-aero btn-warning" style="padding:4px 8px; font-size:11px;" onclick="openFallbackEventModal('${c.table_name}', ${c.current_watermark})">Replay</button>`;
+                    }
+                } else {
+                    actionHtml = `<span style="font-size:11px; color:var(--text-muted);">Read-only</span>`;
+                }
+
+                return `
+                <tr>
+                    <td><strong>${c.table_name}</strong></td>
+                    <td>${c.layer}</td>
+                    <td>${formatUnix(c.current_watermark)}</td>
+                    <td>${formatUnix(c.fallback_watermark)}</td>
+                    <td>${c.last_id || '-'}</td>
+                    <td>${c.offset_val}</td>
+                    <td>${statusBadge}</td>
+                    <td>${formatDate(c.updated_at)}</td>
+                    <td>${actionHtml}</td>
+                </tr>
+                `;
+            }).join('');
+        }
+
+        async function toggleCheckpointOverride(tableName, activate) {
+            try {
+                const res = await fetch('/api/checkpoints/override', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ table_name: tableName, activate_fallback: activate })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(data.message, 'success');
+                    loadCheckpoints();
+                } else {
+                    showToast(data.error || 'Failed to update checkpoint', 'error');
+                }
+            } catch (e) {
+                showToast('Error: ' + e, 'error');
+            }
         }
 
         async function loadBatches() {
             try {
-                const res = await fetch('/api/batches');
-                rawData.batches = await res.json();
-                renderBatchesTable();
-            } catch (e) { console.error(e); }
+                const res = await fetch('/api/batches?limit=100');
+                if (res.ok) {
+                    rawData.batches = await res.json();
+
+                    const tables = [...new Set(rawData.batches.map(b => b.table_name))];
+                    const select = document.getElementById('filter-batches-table');
+                    const currentVal = select.value;
+                    select.innerHTML = '<option value="ALL">All tables</option>' +
+                        tables.map(t => `<option value="${t}">${t}</option>`).join('');
+                    if (tables.includes(currentVal)) select.value = currentVal;
+
+                    renderBatchesTable();
+                }
+            } catch (e) {
+                console.error(e);
+            }
         }
 
         function renderBatchesTable() {
-            const search = document.getElementById('filter-batches-search').value.toLowerCase();
-            const status = document.getElementById('filter-batches-status').value;
+            const tableFilter = document.getElementById('filter-batches-table').value;
+            const statusFilter = document.getElementById('filter-batches-status').value;
+            const tbody = document.getElementById('batches-tbody');
 
             const filtered = rawData.batches.filter(b => {
-                const matchSearch = b.table_name.toLowerCase().includes(search) || (b.query_sent || '').toLowerCase().includes(search);
-                const matchStatus = status === 'ALL' || b.status === status;
-                return matchSearch && matchStatus;
+                const matchesTable = tableFilter === 'ALL' || b.table_name === tableFilter;
+                const matchesStatus = statusFilter === 'ALL' || b.status === statusFilter;
+                return matchesTable && matchesStatus;
             });
 
-            document.getElementById('batches-count-badge').textContent = `${filtered.length} batch(s)`;
-            const tbody = document.getElementById('batches-tbody');
-            if (!filtered.length) {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">Aucun batch correspondant.</td></tr>';
+            document.getElementById('batches-count-badge').textContent = `${filtered.length} batches`;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;">No batches found.</td></tr>`;
                 return;
             }
+
             tbody.innerHTML = filtered.map(b => {
-                const escapedQuery = (b.query_sent || '').replace(/'/g, "\\'");
+                const badgeClass = b.status === 'SUCCESS' ? 'badge-success' : 'badge-failed';
+                const querySnippet = b.query_sent
+                    ? `<code>${b.query_sent.substring(0, 45)}...</code> <button class="btn-copy" onclick="copyText('${encodeURIComponent(b.query_sent)}', 'Query')">Copy</button>`
+                    : '-';
+
                 return `
                 <tr>
-                    <td>${b.batch_id}</td>
+                    <td><code>${b.batch_id}</code></td>
                     <td><strong>${b.table_name}</strong></td>
-                    <td><span class="badge ${b.status === 'SUCCESS' ? 'badge-success' : 'badge-failed'}">${b.status}</span></td>
-                    <td>${b.cursor_value}</td>
-                    <td>${b.offset_value}</td>
+                    <td>${b.layer}</td>
+                    <td><span class="badge ${badgeClass}">${b.status}</span></td>
                     <td><strong>${b.records_count}</strong></td>
                     <td>${b.duration_ms} ms</td>
-                    <td>
-                        <code style="font-size:11px;">${b.query_sent ? b.query_sent.substring(0, 35) + '...' : '-'}</code>
-                        ${b.query_sent ? `<button class="btn-copy" onclick="copyText('${escapedQuery}', 'Requête Apicalypse')">📋</button>` : ''}
-                    </td>
+                    <td>${b.cursor_value || 0} / ${b.offset_value || 0}</td>
+                    <td>${querySnippet}</td>
                     <td>${formatDate(b.created_at)}</td>
                 </tr>
-            `;
+                `;
             }).join('');
         }
 
         async function loadSchemaHistory() {
             try {
                 const res = await fetch('/api/schema-history');
-                rawData.schema = await res.json();
-                renderSchemaTable();
-            } catch (e) { console.error(e); }
+                if (res.ok) {
+                    rawData.schema = await res.json();
+                    renderSchemaTable();
+                }
+            } catch (e) {
+                console.error(e);
+            }
         }
 
         function renderSchemaTable() {
-            const search = document.getElementById('filter-schema-search').value.toLowerCase();
-            const filtered = rawData.schema.filter(s => {
-                return s.table_name.toLowerCase().includes(search) || (s.changes_summary || '').toLowerCase().includes(search);
-            });
-
-            document.getElementById('schema-count-badge').textContent = `${filtered.length} entrée(s)`;
             const tbody = document.getElementById('schema-tbody');
-            if (!filtered.length) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Aucune dérive de schéma enregistrée.</td></tr>';
+            if (rawData.schema.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;">No schema drifts detected.</td></tr>`;
                 return;
             }
 
-            tbody.innerHTML = filtered.map(d => {
-                let badgeHtml = '';
-                if (d.added && d.added.length) {
-                    badgeHtml += d.added.map(a => `<span class="drift-badge drift-added">+${a}</span>`).join('');
-                }
-                if (d.removed && d.removed.length) {
-                    badgeHtml += d.removed.map(r => `<span class="drift-badge drift-removed">-${r}</span>`).join('');
-                }
-                if (d.type_changed && Object.keys(d.type_changed).length) {
-                    badgeHtml += Object.keys(d.type_changed).map(t => `<span class="drift-badge drift-type">~${t}</span>`).join('');
-                }
-                if (!badgeHtml) {
-                    badgeHtml = `<span style="font-size:12px; color:var(--text-muted);">${d.changes_summary || 'Snapshot Initial'}</span>`;
-                }
-
-                const shortHash = d.schema_hash ? d.schema_hash.substring(0, 10) + '...' : '-';
-                const shortRunId = d.detected_in_run_id ? d.detected_in_run_id.substring(0, 8) + '...' : '-';
+            tbody.innerHTML = rawData.schema.map(s => {
+                const addedPills = (s.added || []).map(col => `<span class="drift-badge drift-added">+ ${col}</span>`).join('');
+                const removedPills = (s.removed || []).map(col => `<span class="drift-badge drift-removed">- ${col}</span>`).join('');
+                const typePills = Object.keys(s.type_changed || {}).map(col => `<span class="drift-badge drift-type">~ ${col}</span>`).join('');
+                const badgesHtml = (addedPills + removedPills + typePills) || `<span style="color:var(--text-muted); font-size:11px;">Unchanged / Initial Snapshot</span>`;
 
                 return `
                 <tr>
-                    <td>${d.id}</td>
-                    <td><strong>${d.table_name}</strong></td>
-                    <td>${badgeHtml}</td>
+                    <td><code>${s.id}</code></td>
+                    <td><strong>${s.table_name}</strong></td>
+                    <td>${formatDate(s.detected_at)}</td>
+                    <td>${badgesHtml}</td>
+                    <td><span class="badge badge-success">${s.status}</span></td>
+                    <td><code>${s.action_taken || 'IGNORE_AND_STORE'}</code></td>
                     <td>
-                        <code>${shortHash}</code>
-                        ${d.schema_hash ? `<button class="btn-copy" onclick="copyText('${d.schema_hash}', 'Hash')">📋</button>` : ''}
+                        <code>${s.schema_hash.substring(0, 10)}...</code>
+                        <button class="btn-copy" onclick="copyText('${s.schema_hash}', 'Hash')">Copy</button>
                     </td>
-                    <td>${formatDate(d.detected_at)}</td>
-                    <td>
-                        <code>${shortRunId}</code>
-                        ${d.detected_in_run_id ? `<button class="btn-copy" onclick="copyText('${d.detected_in_run_id}', 'Run ID')">📋</button>` : ''}
-                    </td>
-                    <td><span class="badge badge-running">${d.status}</span></td>
                 </tr>
-            `;
+                `;
             }).join('');
         }
 
         async function loadFallbackEvents() {
             try {
                 const res = await fetch('/api/fallback-events');
-                rawData.fallbackEvents = await res.json();
-                renderFallbackEventsTable();
-            } catch (e) { console.error(e); }
+                if (res.ok) {
+                    rawData.fallbackEvents = await res.json();
+                    renderFallbackEventsTable();
+                }
+            } catch (e) {
+                console.error(e);
+            }
         }
 
         function renderFallbackEventsTable() {
             const tbody = document.getElementById('fallback-events-tbody');
-            if (!rawData.fallbackEvents || !rawData.fallbackEvents.length) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Aucun événement fallback en file d\'attente.</td></tr>';
+            if (rawData.fallbackEvents.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">No fallback events in queue.</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = rawData.fallbackEvents.map(ev => {
-                let badgeClass = 'badge-running';
-                if (ev.status === 'COMPLETED') badgeClass = 'badge-success';
+                let badgeClass = 'badge-success';
                 if (ev.status === 'FAILED') badgeClass = 'badge-failed';
                 if (ev.status === 'PENDING') badgeClass = 'badge-override';
 
@@ -867,7 +1378,7 @@
 
         function openFallbackEventModal(tableName = 'GameSchema', suggestedStartWatermark = null) {
             if (!currentUser.logged_in || currentUser.role !== 'ADMIN') {
-                showToast('Accès refusé: Seul un Administrateur peut créer un événement fallback.', 'error');
+                showToast('Access denied: Only Administrators can create fallback events.', 'error');
                 return;
             }
             if (tableName) document.getElementById('modal-fallback-table').value = tableName;
@@ -886,7 +1397,7 @@
             const endWatermark = document.getElementById('modal-end-watermark').value;
 
             if (!tableName || !startWatermark || !endWatermark) {
-                showToast('Veuillez remplir tous les champs du formulaire.', 'error');
+                showToast('Please fill in all form fields.', 'error');
                 return;
             }
 
@@ -905,13 +1416,13 @@
                     closeFallbackModal();
                     loadFallbackEvents();
                     loadStats();
-                    showToast('Événement Fallback planifié avec succès !', 'success');
+                    showToast('Fallback event scheduled successfully!', 'success');
                 } else {
                     const err = await res.json();
-                    showToast('Erreur: ' + (err.error || 'Échec création'), 'error');
+                    showToast('Error: ' + (err.error || 'Failed to create event'), 'error');
                 }
             } catch (e) {
-                showToast('Erreur réseau lors de la création de l’événement: ' + e, 'error');
+                showToast('Network error while scheduling event: ' + e, 'error');
             }
         }
 

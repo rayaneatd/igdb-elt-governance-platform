@@ -98,20 +98,27 @@ When IGDB introduces new fields or alters signatures:
 │       ├── alerting.py              # Discord webhook alerting
 │       └── types.py                 # Python -> Polars -> PostgreSQL type mappings
 │
-├── app/                             # Frutiger Aero Governance Dashboard
-│   ├── server.py                    # Flask server, authentication & REST APIs
-│   ├── style.css                    # Frutiger Aero design system tokens & animations
+├── app/                             # Frutiger Aero Governance & Market Analytics Dashboard
+│   ├── server.py                    # Flask server, RBAC routing & REST APIs
+│   ├── style.css                    # Frutiger Aero design system, charts & analytics styling
 │   ├── templates/
-│   │   └── index.html               # SPA frontend (KPIs, Runs, Checkpoints, Batch Logs)
+│   │   └── index.html               # SPA frontend (Market Insights, Runs, Checkpoints, Batch Logs)
 │   └── backend/
-│       └── functions.py             # Dashboard queries, password hashing & drift parsing
+│       ├── __init__.py              # Central package export
+│       ├── auth.py                  # .env authentication, RBAC decorators & timing-safe checks
+│       ├── governance.py            # ELT governance queries, runs, checkpoints & drifts
+│       ├── analytics.py             # Market analytics queries, charts data & game explorer
+│       └── functions.py             # Backward-compatible facade
 │
 └── tests/
-    └── public/                      # Unit & integration test suite
+    └── public/                      # Unit & integration test suite (25 tests)
         ├── test_analytics_pipeline.py
+        ├── test_batch_tracking.py
         ├── test_igdb_models.py
-        └── test_index_management.py
+        ├── test_index_management.py
+        └── test_webapp_auth_and_api.py
 ```
+
 
 ---
 
