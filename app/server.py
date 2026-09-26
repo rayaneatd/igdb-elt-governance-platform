@@ -33,6 +33,8 @@ from app.backend.dashboard import (
     search_games_explorer,
     clear_analytics_cache,
 )
+from src.igdb.models import BaseIGDBSchema
+from src.database.analytics import sync_table_indexes
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -52,6 +54,17 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "aero_governance_secret_key_
 
 # Connection pool to PostgreSQL
 db_pool = init_database_engine()
+
+# Sync indexes declared in _index_at for every model at startup.
+# This is idempotent (CREATE INDEX IF NOT EXISTS / DROP obsolete ones).
+# Runs here — not in the pipeline — so the dashboard stays fast even
+# if the indexes were dropped or the model was updated since last run.
+try:
+    for _model in BaseIGDBSchema.__subclasses__():
+        if getattr(_model, "_index_at", ()):
+            sync_table_indexes(db_pool=db_pool, model=_model) # pyrefly: ignore
+except Exception as _e:
+    logging.warning("[startup] Index sync failed (non-fatal): %s", _e)
 
 
 @app.route("/")
@@ -153,8 +166,8 @@ def api_analytics_top_games():
 def api_analytics_games():
     if not db_pool:
         return jsonify({"error": "Database connection pool not initialized"}), 500
-    search = request.args.get("search", default=None, type=str)
-    genre_id = request.args.get("genre_id", default=None, type=int)
+    search = request.args.get("search", default=None, type=str) # pyrefly: ignore
+    genre_id = request.args.get("genre_id", default=None, type=int)# pyrefly: ignore
     sort_by = request.args.get("sort_by", default="rating", type=str)
     limit = request.args.get("limit", default=25, type=int)
     offset = request.args.get("offset", default=0, type=int)
@@ -279,7 +292,7 @@ def api_batches():
     if not db_pool:
         return jsonify({"error": "Database pool unavailable"}), 500
     limit = request.args.get("limit", default=100, type=int)
-    table_name = request.args.get("table_name", default=None, type=str)
+    table_name = request.args.get("table_name", default=None, type=str) # pyrefly: ignore
     batches = get_recent_batches(db_pool, limit=limit, table_name=table_name)
     return jsonify(batches)
 

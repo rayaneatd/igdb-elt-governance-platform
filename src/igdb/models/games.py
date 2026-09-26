@@ -8,7 +8,19 @@ from .BASE import BaseIGDBSchema
 class GameSchema(BaseIGDBSchema):
     _endpoint = "/games"
     _conserve_history = True
-    _index_at = ()
+    _index_at = (
+        # in the Dashboard every analytical query filters on _is_current first.
+        # Compound indexes let Postgres do an index-only scan instead of a full sequential scan on ~200k+ rows
+        #
+        # 1. (_is_current, rating)        → top-rated games, KPI rated_games
+        # 2. (_is_current, first_release_date) → timeline chart, game explorer sort by recent
+        # 3. (_is_current, hypes)         → game explorer sort by hypes
+        # 4. (name,)                      → ILIKE search (prefix scan helps even w/ wildcards)
+        ("_is_current", "rating"),
+        ("_is_current", "first_release_date"),
+        ("_is_current", "hypes"),
+        "name",
+    )
 
     id: int = pt.Field(unique=True)
     name: str
